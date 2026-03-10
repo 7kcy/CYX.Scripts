@@ -333,6 +333,10 @@
     let currentProxy = 0;
 
     function toast(msg, dur=1900){
+        try{
+          const json=JSON.stringify({ type:'editorToast', msg, toastType:'success', dur });
+          if(window.chrome?.webview?.postMessage) window.chrome.webview.postMessage(json);
+        }catch(e){}
         const wrap=document.getElementById('toasts');
         const el=document.createElement('div'); el.className='tst';
         el.style.setProperty('--d',dur+'ms');
