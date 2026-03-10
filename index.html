@@ -219,6 +219,28 @@
         .btn-primary:hover { background:rgba(255,255,255,0.12); }
         .btn-saved { border-color:rgba(100,200,140,0.25); color:rgba(100,200,140,0.75); }
         .btn-saved:hover { background:rgba(100,200,140,0.06); }
+        /* Inline rename row */
+        .rename-row {
+            display:none; align-items:center; gap:6px; width:100%;
+            animation: fadeIn .15s ease;
+        }
+        .rename-row.show { display:flex; }
+        .rename-input {
+            flex:1; height:32px; padding:0 10px;
+            background:#0d0d0d; border:1px solid rgba(255,255,255,.1);
+            border-radius:var(--radius-sm); color:var(--text);
+            font-family:'JetBrains Mono',monospace; font-size:12px; outline:none;
+            transition:border-color .15s;
+        }
+        .rename-input:focus { border-color:rgba(255,255,255,.22); }
+        .rename-confirm {
+            height:32px; padding:0 14px; border-radius:var(--radius-sm);
+            background:var(--active-bg); border:1px solid rgba(255,255,255,.1);
+            color:var(--text); font-family:'Inter',sans-serif; font-size:12px;
+            cursor:pointer; white-space:nowrap;
+            transition:background .13s;
+        }
+        .rename-confirm:hover { background:rgba(255,255,255,.12); }
 
         /* Toast */
         #toasts {
@@ -270,12 +292,18 @@
                     <span class="modal-game" id="modalGame"><i class="fas fa-gamepad"></i> Game</span>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn" id="saveScriptBtn"><i class="fas fa-bookmark"></i> Save</button>
-                <button class="btn" id="copyScriptBtn"><i class="fas fa-copy"></i> Copy</button>
-                <button class="btn btn-primary" id="sendToExplorerBtn">
-                    <i class="fas fa-paper-plane"></i> Send to Explorer
-                </button>
+            <div class="modal-footer" style="flex-direction:column;gap:8px;align-items:stretch;">
+                <div class="rename-row" id="renameRow">
+                    <input class="rename-input" id="renameInput" type="text" placeholder="filename.lua" spellcheck="false"/>
+                    <button class="rename-confirm" id="renameConfirm">Add to Explorer</button>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button class="btn" id="saveScriptBtn"><i class="fas fa-bookmark"></i> Save</button>
+                    <button class="btn" id="copyScriptBtn"><i class="fas fa-copy"></i> Copy</button>
+                    <button class="btn btn-primary" id="sendToExplorerBtn">
+                        <i class="fas fa-paper-plane"></i> Send to Explorer
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -424,6 +452,7 @@
 
     function closeModal(){
         document.getElementById('scriptModal').classList.remove('active');
+        document.getElementById('renameRow').classList.remove('show');
         document.body.style.overflow=''; currentScript=null;
     }
 
@@ -510,20 +539,39 @@
             navigator.clipboard.writeText(currentScript.script||'').then(()=>toast('Copied to clipboard')).catch(()=>toast('Copy failed'));
         });
 
+        // Send to Explorer — show inline rename row first
         document.getElementById('sendToExplorerBtn').addEventListener('click',()=>{
             if(!currentScript) return;
             const code=currentScript.script||'';
-            const name=currentScript.title||'Script';
             if(!code.trim()){ toast('No script content'); return; }
+            // Pre-fill name and show rename row
+            let defaultName = (currentScript.title||'Script').replace(/[<>:"/\\|?*]/g,'').trim();
+            if(!defaultName.match(/\.[a-z]+$/i)) defaultName += '.lua';
+            document.getElementById('renameInput').value = defaultName;
+            document.getElementById('renameRow').classList.add('show');
+            setTimeout(()=>{ document.getElementById('renameInput').focus(); document.getElementById('renameInput').select(); }, 60);
+        });
 
-            // Send to C# — C# relays to Explorer which shows the name prompt
+        // Confirm rename → send to explorer
+        function doSendToExplorer(){
+            if(!currentScript) return;
+            const code = currentScript.script||'';
+            let name = document.getElementById('renameInput').value.trim();
+            if(!name) name = (currentScript.title||'Script');
+            if(!name.match(/\.[a-z]+$/i)) name += '.lua';
             postToHost({ type:'addToExplorer', content:code, name:name });
-
+            // Visual feedback
+            document.getElementById('renameRow').classList.remove('show');
             const btn=document.getElementById('sendToExplorerBtn');
             btn.innerHTML='<i class="fas fa-check"></i> Sent!';
             btn.className='btn btn-saved';
             toast('Sent to Explorer');
             setTimeout(()=>{ btn.innerHTML='<i class="fas fa-paper-plane"></i> Send to Explorer'; btn.className='btn btn-primary'; },2500);
+        }
+        document.getElementById('renameConfirm').addEventListener('click', doSendToExplorer);
+        document.getElementById('renameInput').addEventListener('keydown', e=>{
+            if(e.key==='Enter') doSendToExplorer();
+            if(e.key==='Escape') document.getElementById('renameRow').classList.remove('show');
         });
     });
 </script>
